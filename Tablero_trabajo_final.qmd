@@ -8,7 +8,7 @@ Quarto enables you to weave together content and executable code into a finished
 
 
 quarto publish gh-pages Tablero_trabajo_final.qmd
-
+G
 
 
 
