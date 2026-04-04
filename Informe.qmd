@@ -26,10 +26,8 @@ library(scales)
 # Limpieza del entorno de trabajo
 rm(list = ls())
 
-# Carga de datos desde un enlace de Google Sheets
-#datos <- read.xlsx("https://docs.google.com/spreadsheets/d/e/2PACX-1vTs-CC_vSsNazKCuLlF8cQZpbPpI1-AYgAyFKB7Z6CyRh_BXWYclZ0ykOy37I7KQg/pub?output=xlsx&authuser=1")
+datos <- read.xlsx("C:\\Users\\Brian.Ruiz\\OneDrive - Universidad Tecnológica de Pereira\\1. UTP\\2. Introducción a la Ciencia de Datos\\2026-03-Trabajo Fina\\DATA\\Evaluaciones_Agropecuarias_Municipales_–_EVA._2019_-_2024._Base_Agrícola_20260327.xlsx")
 
-datos <- read.xlsx("https://docs.google.com/spreadsheets/d/e/2PACX-1vRLYTnqc_ARDjofjUvjZ4X8F1K2aj9cAvOiKE0JTwwcKWr5sSQUqqeP-jcvq6FJkg/pub?output=xlsx")
 
 # Limpieza de nombres de columnas
 datos <- datos %>% clean_names()
