@@ -1,6 +1,8 @@
 ---
 title: "Gráficos Interactivos con GGIRAPH y PLOTLY"
 author: "Brian Ruiz"
+format: html
+embed-resources: true
 ---
 
 
@@ -21,15 +23,11 @@ library(ggcorrplot)
 
 ```{r}
 #| warning: false
-rm(list = ls()) # Limpieza del entorno de trabajo
+rm(list = ls())
 
-# datos <- read.xlsx("https://docs.google.com/spreadsheets/d/e/2PACX-1vRs-u5yeAgR3kl765njqgXdyxh34gw2UrTcPRoV6LDu_O2fcxIZDiuS45r_1yQj4Q/pub?output=xlsx")
-# Usar archivo local
-datos <- read.xlsx("DATA/Evaluaciones_Agropecuarias_Municipales_–_EVA._2019_-_2024._Base_Agrícola_20260327.xlsx")
-
-
-datos <- datos %>% clean_names() # Limpieza de nombres de columnas
-datos <- datos %>% select(-codigo_dane_departamento, -codigo_dane_municipio, -codigo_del_cultivo)
+datos <- read.xlsx("DATA/Evaluaciones_Agropecuarias_Municipales_–_EVA._2019_-_2024._Base_Agrícola_20260327.xlsx") %>%
+  clean_names() %>%
+  select(-codigo_dane_departamento, -codigo_dane_municipio, -codigo_del_cultivo)
 ```
 
 
@@ -43,27 +41,23 @@ nombres_top3 <- datos %>% group_by(cultivo) %>%
 
 
 ```{r}
-p  <- datos %>% 
-  filter(cultivo %in% nombres_top3 ) %>% 
+grafico_prod <- datos %>% 
+  filter(cultivo %in% nombres_top3) %>% 
   group_by(ano, cultivo) %>%
-  summarise(produccion_anual = round(sum(produccion)), .groups = "drop") %>% 
-  
-  ggplot(aes(x = ano, y = produccion_anual, color = cultivo)) +
+  summarise(produccion_anual = round(sum(produccion)), .groups = "drop")
+
+ggplot(grafico_prod, aes(x = ano, y = produccion_anual, color = cultivo)) +
   geom_line_interactive(aes(tooltip = cultivo, data_id = cultivo)) +
   geom_point_interactive(aes(tooltip = paste0("Año: ", ano, "\nProducción: ", comma(produccion_anual)))) +
-
-  # 2. Corregimos el eje Y para que use puntos de miles
   scale_y_continuous(labels = label_comma(big.mark = ".", decimal.mark = ",")) +
-  
   labs(
     title = str_wrap("Evolución de la Producción de los 3 cultivos principales de Colombia entre 2019 y 2024", width = 55), 
     x = "Año", 
     y = "Producción (Toneladas)"
-  )+
-  
-  theme_minimal() 
+  ) +
+  theme_minimal()
 
-girafe(ggobj = p)
+girafe(ggobj = last_plot())
 ```
 
 
@@ -74,22 +68,25 @@ girafe(ggobj = p)
 
 # --- ANÁLISIS DE LA VARIABLE DEPARTAMENTO ---
 
-# 1. Crear la tabla de frecuencia (Top 10)
-tabla_dept <- datos %>%
+# Crear gráfica y extraer variables en un solo pipeline
+dept_info <- datos %>%
   count(departamento, name = "cantidad") %>%
   arrange(desc(cantidad)) %>%
-  slice_head(n = 10)
-
-# 2. Guardar variables para el texto automatizado
-top_dept <- tabla_dept$departamento[1]
-num_dept <- comma(tabla_dept$cantidad[1], big.mark = ".", decimal.mark = ",")
-
-# 3. Crear la gráfica de barras interactiva
-p_dept <- tabla_dept %>%
+  slice_head(n = 10) %>%
+  {
+    # Guardar variables para texto automatizado
+    top_dept <<- .$departamento[1]
+    num_dept <<- comma(.$cantidad[1], big.mark = ".", decimal.mark = ",")
+    # Retornar para continuar con ggplot
+    .
+  } %>%
   ggplot(aes(x = reorder(departamento, cantidad), y = cantidad, fill = departamento)) +
-  geom_col_interactive(aes(tooltip = paste0(departamento, ": ", comma(cantidad, big.mark = ".", decimal.mark = ",")), data_id = departamento), 
-                       show.legend = FALSE) + # Ocultamos leyenda porque los nombres ya están en el eje
-  coord_flip() + # Giramos la gráfica para leer mejor los nombres
+  geom_col_interactive(
+    aes(tooltip = paste0(departamento, ": ", comma(cantidad, big.mark = ".", decimal.mark = ",")), 
+        data_id = departamento), 
+    show.legend = FALSE
+  ) +
+  coord_flip() +
   scale_y_continuous(labels = label_comma(big.mark = ".", decimal.mark = ",")) +
   labs(
     title = "Top 10 Departamentos con mayor número de registros agrícolas",
@@ -98,7 +95,7 @@ p_dept <- tabla_dept %>%
   ) +
   theme_minimal()
 
-girafe(ggobj = p_dept)
+girafe(ggobj = dept_info)
 ```
 
 
@@ -112,19 +109,19 @@ De acuerdo con la tabla de frecuencias y la gráfica anterior, el departamento q
 
 # --- ANÁLISIS DE LA VARIABLE GRUPO DE CULTIVO ---
 
-# 1. Crear la tabla de frecuencia
-tabla_grupo <- datos %>%
+grupo_info <- datos %>%
   count(grupo_cultivo, name = "cantidad") %>%
-  arrange(desc(cantidad))
-
-# 2. Guardar variables para el texto automatizado
-top_grupo <- tabla_grupo$grupo_cultivo[1]
-num_grupo <- comma(tabla_grupo$cantidad[1], big.mark = ".", decimal.mark = ",")
-
-# 3. Crear la gráfica de columnas interactiva
-p_grupo <- tabla_grupo %>%
+  arrange(desc(cantidad)) %>%
+  {
+    top_grupo <<- .$grupo_cultivo[1]
+    num_grupo <<- comma(.$cantidad[1], big.mark = ".", decimal.mark = ",")
+    .
+  } %>%
   ggplot(aes(x = reorder(grupo_cultivo, -cantidad), y = cantidad, fill = grupo_cultivo)) +
-  geom_col_interactive(aes(tooltip = paste0(grupo_cultivo, ": ", comma(cantidad, big.mark = ".", decimal.mark = ",")), data_id = grupo_cultivo)) +
+  geom_col_interactive(
+    aes(tooltip = paste0(grupo_cultivo, ": ", comma(cantidad, big.mark = ".", decimal.mark = ",")), 
+        data_id = grupo_cultivo)
+  ) +
   scale_y_continuous(labels = label_comma(big.mark = ".", decimal.mark = ",")) +
   labs(
     title = "Cantidad de registros por Grupo de Cultivo",
@@ -134,11 +131,11 @@ p_grupo <- tabla_grupo %>%
   ) +
   theme_minimal() +
   theme(
-    axis.text.x = element_blank(), # Ocultamos el texto del eje X porque ya está en la leyenda
+    axis.text.x = element_blank(),
     axis.ticks.x = element_blank()
   )
 
-girafe(ggobj = p_grupo)
+girafe(ggobj = grupo_info)
 ```
 
 
@@ -153,34 +150,35 @@ En el análisis por categorías, se evidencia que el grupo predominante es `r to
 
 # --- TABLA CRUZADA 1: Top 5 Departamentos vs Top 4 Grupos de Cultivo ---
 
-# 1. Identificar los Top para filtrar y no saturar la gráfica
+# Identificar top 5 departamentos y top 4 grupos
 top5_dept <- datos %>% count(departamento) %>% top_n(5, n) %>% pull(departamento)
 top4_grupos <- datos %>% count(grupo_cultivo) %>% top_n(4, n) %>% pull(grupo_cultivo)
 
-# 2. Filtrar los datos y crear la tabla pivotante (como pide la rúbrica)
+# Crear tabla pivotante y gráfico en un solo pipeline
 tabla_contingencia_1 <- datos %>%
   filter(departamento %in% top5_dept, grupo_cultivo %in% top4_grupos) %>%
   count(departamento, grupo_cultivo) %>%
+  {
+    # Extraer variables para texto automatizado antes de pivot_wider
+    dept_ejemplo <<- .$departamento[1]
+    grupo_ejemplo <<- (pivot_wider(., names_from = grupo_cultivo, values_from = n, values_fill = 0) %>% colnames())[2]
+    valor_ejemplo <<- comma(.$n[1], big.mark = ".", decimal.mark = ",")
+    # Retornar datos sin pivotar para el gráfico
+    .
+  } %>%
   pivot_wider(names_from = grupo_cultivo, values_from = n, values_fill = 0)
 
-# Imprimir la tabla para que se vea en el informe (opcional, puedes usar datatable)
 datatable(tabla_contingencia_1, options = list(pageLength = 5))
 
-# 3. Preparar variables para el texto automatizado
-# Extraemos el valor de la primera fila y segunda columna (ej. registros del grupo 1 en el dept 1)
-dept_ejemplo <- tabla_contingencia_1$departamento[1]
-grupo_ejemplo <- colnames(tabla_contingencia_1)[2]
-valor_ejemplo <- comma(tabla_contingencia_1[[2]][1], big.mark = ".", decimal.mark = ",")
-
-# 4. Gráfica de barras apiladas
-p_cont_1 <- datos %>%
+# Gráfico de barras apiladas (reutilizando datos filtrados)
+datos %>%
   filter(departamento %in% top5_dept, grupo_cultivo %in% top4_grupos) %>%
   count(departamento, grupo_cultivo) %>%
   ggplot(aes(x = departamento, y = n, fill = grupo_cultivo)) +
   geom_col_interactive(
     aes(tooltip = paste0("Grupo: ", grupo_cultivo, "\nRegistros: ", comma(n, big.mark = ".", decimal.mark = ",")), 
         data_id = grupo_cultivo), 
-    position = "stack" # Apiladas
+    position = "stack"
   ) +
   scale_y_continuous(labels = label_comma(big.mark = ".", decimal.mark = ",")) +
   labs(
@@ -191,7 +189,7 @@ p_cont_1 <- datos %>%
   ) +
   theme_minimal()
 
-girafe(ggobj = p_cont_1)
+girafe(ggobj = last_plot())
 ```
 
 
@@ -205,28 +203,27 @@ Al analizar de forma cruzada los principales departamentos y grupos de cultivo, 
 
 # --- TABLA CRUZADA 2: Top 5 Departamentos vs Top 3 Cultivos Específicos ---
 
-# 1. Crear la tabla pivotante
 tabla_contingencia_2 <- datos %>%
   filter(departamento %in% top5_dept, cultivo %in% nombres_top3) %>%
   count(departamento, cultivo) %>%
+  {
+    cultivo_ejemplo <<- (pivot_wider(., names_from = cultivo, values_from = n, values_fill = 0) %>% colnames())[2]
+    valor_cultivo_ejemplo <<- comma(.$n[1], big.mark = ".", decimal.mark = ",")
+    .
+  } %>%
   pivot_wider(names_from = cultivo, values_from = n, values_fill = 0)
 
 datatable(tabla_contingencia_2, options = list(pageLength = 5))
 
-# 2. Variables para el texto automatizado
-# Buscamos cuántos registros tiene el cultivo #1 en el departamento #1
-cultivo_ejemplo <- colnames(tabla_contingencia_2)[2]
-valor_cultivo_ejemplo <- comma(tabla_contingencia_2[[2]][1], big.mark = ".", decimal.mark = ",")
-
-# 3. Gráfica de barras agrupadas
-p_cont_2 <- datos %>%
+# Gráfico de barras agrupadas
+datos %>%
   filter(departamento %in% top5_dept, cultivo %in% nombres_top3) %>%
   count(departamento, cultivo) %>%
   ggplot(aes(x = departamento, y = n, fill = cultivo)) +
   geom_col_interactive(
     aes(tooltip = paste0("Cultivo: ", cultivo, "\nRegistros: ", comma(n, big.mark = ".", decimal.mark = ",")), 
         data_id = cultivo), 
-    position = "dodge" # Agrupadas (una al lado de la otra)
+    position = "dodge"
   ) +
   scale_y_continuous(labels = label_comma(big.mark = ".", decimal.mark = ",")) +
   labs(
@@ -237,7 +234,7 @@ p_cont_2 <- datos %>%
   ) +
   theme_minimal()
 
-girafe(ggobj = p_cont_2)
+girafe(ggobj = last_plot())
 ```
 
 
@@ -248,31 +245,26 @@ En cuanto a los cultivos más representativos a nivel nacional, su distribución
 #| warning: false
 #| message: false
 
-# --- PASO 3: MATRIZ DE CORRELACIÓN ---
+# --- MATRIZ DE CORRELACIÓN ---
 
-# 1. Seleccionar variables numéricas
-var_numericas <- datos %>% 
+corr_info <- datos %>% 
   select(produccion, area_sembrada, area_cosechada, rendimiento) %>% 
-  drop_na()
+  drop_na() %>% 
+  cor()
 
-# 2. Calcular matriz de correlación
-matriz_cor <- cor(var_numericas)
+corr_prod_rend <- round(corr_info["produccion", "rendimiento"], 3)
+corr_area_prod <- round(corr_info["area_sembrada", "produccion"], 3)
 
-# 3. Variables para texto automatizado
-corr_prod_rend <- round(matriz_cor["produccion", "rendimiento"], 3)
-corr_area_prod <- round(matriz_cor["area_sembrada", "produccion"], 3)
+ggcorrplot(corr_info, 
+           method = "circle", 
+           type = "lower",
+           lab = TRUE,
+           lab_size = 4,
+           colors = c("#d73027", "#ffffbf", "#1a9850"),
+           title = "Matriz de Correlación entre Variables Numéricas",
+           ggtheme = theme_minimal())
 
-# 4. Crear gráfica de correlación con ggcorrplot
-p_cor <- ggcorrplot(matriz_cor, 
-                     method = "circle", 
-                     type = "lower",
-                     lab = TRUE,
-                     lab_size = 4,
-                     colors = c("#d73027", "#ffffbf", "#1a9850"),
-                     title = "Matriz de Correlación entre Variables Numéricas",
-                     ggtheme = theme_minimal())
-
-girafe(ggobj = p_cor)
+girafe(ggobj = last_plot())
 ```
 
 La matriz de correlación revela que existe una correlación positiva fuerte de `r corr_area_prod` entre el área sembrada y la producción, mientras que la relación entre producción y rendimiento es de `r corr_prod_rend`, lo cual indica una asociación directa entre estas variables del sector agropecuario.
@@ -282,9 +274,8 @@ La matriz de correlación revela que existe una correlación positiva fuerte de 
 #| warning: false
 #| message: false
 
-# --- PASO 4: MEDIDAS RESUMEN POR CULTIVO ---
+# --- MEDIDAS RESUMEN POR CULTIVO ---
 
-# 1. Calcular medidas resumen para los top 3 cultivos
 medidas_resumen <- datos %>%
   filter(cultivo %in% nombres_top3) %>%
   group_by(cultivo) %>%
@@ -300,14 +291,12 @@ medidas_resumen <- datos %>%
     .groups = "drop"
   )
 
-# Mostrar tabla
-datatable(medidas_resumen, options = list(pageLength = 5))
-
-# 2. Variables para texto automatizado
 cultivo_max_media <- medidas_resumen %>% slice_max(Media, n = 1) %>% pull(cultivo)
-valor_max_media <- comma(medidas_resumen %>% slice_max(Media, n = 1) %>% pull(Media), big.mark = ".", decimal.mark = ",")
+valor_max_media <- medidas_resumen %>% slice_max(Media, n = 1) %>% pull(Media) %>% comma(big.mark = ".", decimal.mark = ",")
 cultivo_max_iqr <- medidas_resumen %>% slice_max(IQR, n = 1) %>% pull(cultivo)
-valor_max_iqr <- comma(medidas_resumen %>% slice_max(IQR, n = 1) %>% pull(IQR), big.mark = ".", decimal.mark = ",")
+valor_max_iqr <- medidas_resumen %>% slice_max(IQR, n = 1) %>% pull(IQR) %>% comma(big.mark = ".", decimal.mark = ",")
+
+datatable(medidas_resumen, options = list(pageLength = 5))
 ```
 
 El análisis de medidas resumen por cultivo muestra que `r cultivo_max_media` presenta la mayor producción promedio con `r valor_max_media` toneladas. En cuanto a la variabilidad, `r cultivo_max_iqr` tiene el mayor rango intercuartílico con `r valor_max_iqr` toneladas, indicando una mayor dispersión en los datos de producción.
@@ -317,30 +306,13 @@ El análisis de medidas resumen por cultivo muestra que `r cultivo_max_media` pr
 #| warning: false
 #| message: false
 
-# --- PASO 5: DISTRIBUCIÓN Y NORMALIDAD ---
+# --- DISTRIBUCIÓN Y NORMALIDAD ---
 
-# 1. Tabla de frecuencias para producción (con intervalos)
-prod_data <- datos %>% filter(!is.na(produccion)) %>% pull(produccion)
+# Filtrar datos una sola vez para todos los gráficos
+prod_filtrada <- datos %>% filter(cultivo %in% nombres_top3[1], !is.na(produccion))
 
-n_intervalos <- 10
-min_prod <- min(prod_data)
-max_prod <- max(prod_data)
-intervalos <- seq(min_prod, max_prod, length.out = n_intervalos + 1)
-
-tabla_frec <- prod_data %>% 
-  table() %>%
-  as.data.frame() %>%
-  rename("Valor" = ".", "Frecuencia" = "Freq")
-
-# 2. Variables para histogramas y pruebas
-cultivo_ejemplo_dist <- nombres_top3[1]
-prod_cultivo <- datos %>% 
-  filter(cultivo == cultivo_ejemplo_dist, !is.na(produccion)) %>% 
-  pull(produccion)
-
-# 3. Histograma
-p_hist <- datos %>%
-  filter(cultivo %in% nombres_top3[1], !is.na(produccion)) %>%
+# Histograma
+prod_filtrada %>%
   ggplot(aes(x = produccion)) +
   geom_histogram(bins = 20, fill = "#2171b5", color = "white") +
   labs(
@@ -350,11 +322,10 @@ p_hist <- datos %>%
   ) +
   theme_minimal()
 
-girafe(ggobj = p_hist)
+girafe(ggobj = last_plot())
 
-# 4. Gráfico de densidad
-p_dens <- datos %>%
-  filter(cultivo %in% nombres_top3[1], !is.na(produccion)) %>%
+# Gráfico de densidad
+prod_filtrada %>%
   ggplot(aes(x = produccion)) +
   geom_density(fill = "#4292c6", alpha = 0.5) +
   labs(
@@ -364,11 +335,10 @@ p_dens <- datos %>%
   ) +
   theme_minimal()
 
-girafe(ggobj = p_dens)
+girafe(ggobj = last_plot())
 
-# 5. Distribución empírica (ECDF)
-p_ecdf <- datos %>%
-  filter(cultivo %in% nombres_top3[1], !is.na(produccion)) %>%
+# Distribución empírica (ECDF)
+prod_filtrada %>%
   ggplot(aes(x = produccion)) +
   stat_ecdf(geom = "step", color = "#2171b5") +
   labs(
@@ -378,18 +348,19 @@ p_ecdf <- datos %>%
   ) +
   theme_minimal()
 
-girafe(ggobj = p_ecdf)
+girafe(ggobj = last_plot())
 
-# 6. Prueba de normalidad (Shapiro-Wilk)
-muestra_prod <- datos %>% 
-  filter(cultivo == cultivo_ejemplo_dist, !is.na(produccion)) %>% 
+# Prueba de Shapiro-Wilk (extraer variables en un solo paso)
+shapiro_test <- datos %>% 
+  filter(cultivo == nombres_top3[1], !is.na(produccion)) %>% 
   pull(produccion) %>% 
-  head(5000)
+  head(5000) %>%
+  { list(test = shapiro.test(.), data = .) }
 
-shapiro_test <- shapiro.test(muestra_prod)
-estadistico_shap <- round(shapiro_test$statistic, 4)
-valor_p_shap <- format(shapiro_test$p.value, scientific = TRUE)
-normalidad <- ifelse(shapiro_test$p.value < 0.05, "NO se ajustan a una distribución normal", "se ajustan a una distribución normal")
+estadistico_shap <- round(shapiro_test$test$statistic, 4)
+valor_p_shap <- format(shapiro_test$test$p.value, scientific = TRUE)
+normalidad <- ifelse(shapiro_test$test$p.value < 0.05, "NO se ajustan a una distribución normal", "se ajustan a una distribución normal")
+cultivo_ejemplo_dist <- nombres_top3[1]
 ```
 
 Los histogramas, gráficos de densidad y distribución empírica muestran la forma de la variable producción para el cultivo de `r cultivo_ejemplo_dist`. La prueba de Shapiro-Wilk obtiene un estadístico de `r estadistico_shap` con un valor-p de `r valor_p_shap`, lo que indica que los datos `r normalidad` (al nivel de significancia 0.05).
@@ -399,27 +370,23 @@ Los histogramas, gráficos de densidad y distribución empírica muestran la for
 #| warning: false
 #| message: false
 
-# --- PASO 6: INTERVALOS DE CONFIANZA ---
+# --- INTERVALOS DE CONFIANZA ---
 
-# 1. Intervalo de confianza para la media de producción del cultivo #1
-ic_cultivo1 <- t.test(datos %>% filter(cultivo == nombres_top3[1]) %>% pull(produccion), conf.level = 0.95)
-li_1 <- round(ic_cultivo1$conf.int[1], 2)
-ls_1 <- round(ic_cultivo1$conf.int[2], 2)
-media_1 <- round(ic_cultivo1$estimate, 2)
+tabla_ic <- nombres_top3[1:2] %>%
+  map(~ datos %>% filter(cultivo == .x, !is.na(produccion)) %>% pull(produccion) %>% t.test(conf.level = 0.95)) %>%
+  map_dfr(~ data.frame(
+    Cultivo = NA,
+    Media = round(.x$estimate, 2),
+    LI_95 = round(.x$conf.int[1], 2),
+    LS_95 = round(.x$conf.int[2], 2)
+  )) %>%
+  mutate(Cultivo = nombres_top3[1:2])
 
-# 2. Intervalo de confianza para la media de producción del cultivo #2
-ic_cultivo2 <- t.test(datos %>% filter(cultivo == nombres_top3[2]) %>% pull(produccion), conf.level = 0.95)
-li_2 <- round(ic_cultivo2$conf.int[1], 2)
-ls_2 <- round(ic_cultivo2$conf.int[2], 2)
-media_2 <- round(ic_cultivo2$estimate, 2)
-
-# Crear tabla de intervalos de confianza
-tabla_ic <- data.frame(
-  Cultivo = nombres_top3[1:2],
-  Media = c(media_1, media_2),
-  LI_95 = c(li_1, li_2),
-  LS_95 = c(ls_1, ls_2)
-)
+# Extraer valores para texto automatizado
+li_1 <- tabla_ic$LI_95[1]
+ls_1 <- tabla_ic$LS_95[1]
+li_2 <- tabla_ic$LI_95[2]
+ls_2 <- tabla_ic$LS_95[2]
 
 datatable(tabla_ic, options = list(pageLength = 5))
 ```
